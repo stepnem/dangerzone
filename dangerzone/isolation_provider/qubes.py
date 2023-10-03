@@ -10,6 +10,7 @@ import sys
 import tempfile
 import time
 import zipfile
+from PIL import Image
 from pathlib import Path
 from typing import IO, Callable, Optional
 
@@ -121,6 +122,9 @@ class Qubes(IsolationProvider):
             sw = Stopwatch(timeout)
             sw.start()
             for page in range(1, n_pages + 1):
+                text = f"Converting page {page}/{n_pages} to pixels"
+                self.print_progress_trusted(document, False, text, percentage)
+
                 width = read_int(self.proc.stdout, timeout=sw.remaining)
                 height = read_int(self.proc.stdout, timeout=sw.remaining)
                 if not (1 <= width <= errors.MAX_PAGE_WIDTH):
@@ -135,18 +139,10 @@ class Qubes(IsolationProvider):
                     timeout=sw.remaining,
                 )
 
-                # Wrapper code
-                with open(f"/tmp/dangerzone/page-{page}.width", "w") as f_width:
-                    f_width.write(str(width))
-                with open(f"/tmp/dangerzone/page-{page}.height", "w") as f_height:
-                    f_height.write(str(height))
-                with open(f"/tmp/dangerzone/page-{page}.rgb", "wb") as f_rgb:
-                    f_rgb.write(untrusted_pixels)
+                image = Image.frombuffer("RGB", (width, height), untrusted_pixels, "raw", "RGB", 0, 1)
+                image.save(f"/tmp/page-{page}.png", "PNG")
 
                 percentage += percentage_per_page
-
-                text = f"Converting page {page}/{n_pages} to pixels"
-                self.print_progress_trusted(document, False, text, percentage)
 
         # Ensure nothing else is read after all bitmaps are obtained
         self.proc.stdout.close()
@@ -155,21 +151,12 @@ class Qubes(IsolationProvider):
         text = "Converted document to pixels"
         self.print_progress_trusted(document, False, text, percentage)
 
-        if getattr(sys, "dangerzone_dev", False):
-            assert self.proc.stderr is not None
-            os.set_blocking(self.proc.stderr.fileno(), False)
-            untrusted_log = read_debug_text(self.proc.stderr, MAX_CONVERSION_LOG_CHARS)
-            self.proc.stderr.close()
-            log.info(
-                f"Conversion output (doc to pixels)\n{self.sanitize_conversion_str(untrusted_log)}"
-            )
-
         def print_progress_wrapper(error: bool, text: str, percentage: float) -> None:
             self.print_progress_trusted(document, error, text, percentage)
 
         converter = PixelsToPDF(progress_callback=print_progress_wrapper)
         try:
-            asyncio.run(converter.convert(ocr_lang))
+            asyncio.run(converter.convert(ocr_lang, expect_rgb=False, num_pages=n_pages))
         except (RuntimeError, TimeoutError, ValueError) as e:
             raise errors.UnexpectedConversionError(str(e))
         finally:
@@ -194,6 +181,14 @@ class Qubes(IsolationProvider):
         try:
             return self.__convert(document, ocr_lang)
         except errors.InterruptedConversion:
+            if getattr(sys, "dangerzone_dev", False):
+                assert self.proc.stderr is not None
+                os.set_blocking(self.proc.stderr.fileno(), False)
+                untrusted_log = read_debug_text(self.proc.stderr, MAX_CONVERSION_LOG_CHARS)
+                self.proc.stderr.close()
+                log.info(
+                    f"Conversion output (doc to pixels)\n{self.sanitize_conversion_str(untrusted_log)}"
+                )
             assert self.proc is not None
             error_code = self.proc.wait(3)
             # XXX Reconstruct exception from error code

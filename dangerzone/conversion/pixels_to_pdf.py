@@ -17,11 +17,12 @@ from .common import DangerzoneConverter, running_on_qubes
 
 
 class PixelsToPDF(DangerzoneConverter):
-    async def convert(self, ocr_lang: Optional[str] = None) -> None:
+    async def convert(self, ocr_lang: Optional[str] = None, expect_rgb=True, num_pages=None) -> None:
         self.percentage = 50.0
-
-        num_pages = len(glob.glob("/tmp/dangerzone/page-*.rgb"))
         total_size = 0.0
+
+        if num_pages is None:
+            num_pages = len(glob.glob("/tmp/dangerzone/page-*.rgb"))
 
         # Convert RGB files to PDF files
         percentage_per_page = 45.0 / num_pages
@@ -34,19 +35,22 @@ class PixelsToPDF(DangerzoneConverter):
             ocr_filename = f"/tmp/page-{page}"
             pdf_filename = f"/tmp/page-{page}.pdf"
 
-            with open(width_filename) as f:
-                width = f.read().strip()
-            with open(height_filename) as f:
-                height = f.read().strip()
-
             # The first few operations happen on a per-page basis.
-            page_size = os.path.getsize(filename_base + ".rgb") / 1024**2
+            if expect_rgb:
+                page_size = os.path.getsize(rgb_filename) / 1024**2
+            else:
+                page_size = os.path.getsize(png_filename) / 1024**2
             total_size += page_size
             timeout = self.calculate_timeout(page_size, 1)
 
-            if ocr_lang:  # OCR the document
+            if expect_rgb:
+                with open(width_filename) as f:
+                    width = f.read().strip()
+                with open(height_filename) as f:
+                    height = f.read().strip()
+
                 self.update_progress(
-                    f"Converting page {page}/{num_pages} from pixels to searchable PDF"
+                    f"Converting page {page}/{num_pages} from pixels to PNG"
                 )
                 await self.run_command(
                     [
@@ -65,6 +69,10 @@ class PixelsToPDF(DangerzoneConverter):
                         f" {timeout} seconds"
                     ),
                     timeout=timeout,
+                )
+            if ocr_lang:  # OCR the document
+                self.update_progress(
+                    f"Converting page {page}/{num_pages} from pixels to searchable PDF"
                 )
                 await self.run_command(
                     [
@@ -93,16 +101,12 @@ class PixelsToPDF(DangerzoneConverter):
                     [
                         "gm",
                         "convert",
-                        "-size",
-                        f"{width}x{height}",
-                        "-depth",
-                        "8",
-                        f"rgb:{rgb_filename}",
+                        f"png:{png_filename}",
                         f"pdf:{pdf_filename}",
                     ],
                     error_message=f"Page {page}/{num_pages} conversion to PDF failed",
                     timeout_message=(
-                        "Error converting RGB to PDF, convert timed out after"
+                        "Error converting PNG to PDF, convert timed out after"
                         f" {timeout} seconds"
                     ),
                     timeout=timeout,
