@@ -21,6 +21,7 @@ pyxdg = {version = "*", platform = "linux"}
 requests = "*"
 markdown = "*"
 packaging = "*"
+Pillow = "*"
 
 [tool.poetry.scripts]
 dangerzone = 'dangerzone:main'
