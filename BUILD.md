@@ -194,7 +194,7 @@ Overview of the qubes you'll create:
    ```
    sudo dnf install -y rpm-build podman python3 python3-devel \
        python3-poetry-core pipx qt6-qtbase-gui libreoffice python3-magic \
-       python3-keyring tesseract*
+       python3-PyMuPDF python3-keyring tesseract*
    ```
 
 2. Shutdown the `fedora-38-dz` template:
