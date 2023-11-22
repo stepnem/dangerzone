@@ -1,13 +1,18 @@
 import logging
+import os
 import subprocess
+import sys
+import tempfile
 from abc import ABC, abstractmethod
-from typing import Callable, Optional
+from pathlib import Path
+from typing import IO, Callable, Optional
 
 from colorama import Fore, Style
 
-from ..conversion.errors import ConversionException
+from ..conversion import errors
+from ..conversion.common import calculate_timeout
 from ..document import Document
-from ..util import replace_control_chars
+from ..util import Stopwatch, nonblocking_read, replace_control_chars
 
 log = logging.getLogger(__name__)
 
@@ -18,10 +23,34 @@ PIXELS_TO_PDF_LOG_START = "----- PIXELS TO PDF LOG START -----"
 PIXELS_TO_PDF_LOG_END = "----- PIXELS TO PDF LOG END -----"
 
 
+def read_bytes(f: IO[bytes], size: int, timeout: float, exact: bool = True) -> bytes:
+    """Read bytes from a file-like object."""
+    buf = nonblocking_read(f, size, timeout)
+    if exact and len(buf) != size:
+        raise errors.InterruptedConversion
+    return buf
+
+
+def read_int(f: IO[bytes], timeout: float) -> int:
+    """Read 2 bytes from a file-like object, and decode them as int."""
+    untrusted_int = read_bytes(f, 2, timeout)
+    return int.from_bytes(untrusted_int, signed=False)
+
+
+def read_debug_text(f: IO[bytes], size: int) -> str:
+    """Read arbitrarily long text (for debug purposes)"""
+    timeout = calculate_timeout(size)
+    untrusted_text = read_bytes(f, size, timeout, exact=False)
+    return untrusted_text.decode("ascii", errors="replace")
+
+
 class IsolationProvider(ABC):
     """
     Abstracts an isolation provider
     """
+
+    def __init__(self) -> None:
+        self.percentage = 0.0
 
     @abstractmethod
     def install(self) -> bool:
@@ -37,7 +66,7 @@ class IsolationProvider(ABC):
         document.mark_as_converting()
         try:
             success = self._convert(document, ocr_lang)
-        except ConversionException as e:
+        except errors.ConversionException as e:
             success = False
             self.print_progress_trusted(document, True, str(e), 0)
         except Exception as e:
@@ -100,6 +129,113 @@ class IsolationProvider(ABC):
         armor_start = f"{DOC_TO_PIXELS_LOG_START}\n"
         armor_end = DOC_TO_PIXELS_LOG_END
         return armor_start + conversion_string + armor_end
+
+
+class ProcessBasedIsolationProvider(IsolationProvider):
+    # The maximum time it takes a the provider to start up.
+    STARTUP_TIME_SECONDS = 0
+
+    def __init__(self) -> None:
+        self.proc: Optional[subprocess.Popen] = None
+        super().__init__()
+
+    @abstractmethod
+    def get_doc_to_pixels_proc(self) -> subprocess.Popen:
+        pass
+
+    def _convert(
+        self,
+        document: Document,
+        ocr_lang: Optional[str] = None,
+    ) -> bool:
+        try:
+            with tempfile.TemporaryDirectory() as t:
+                Path(f"{t}/pixels").mkdir()
+                self.doc_to_pixels(document, t)
+                # TODO: validate convert to pixels output
+                self.pixels_to_pdf(document, t, ocr_lang)
+                return True
+        except errors.InterruptedConversion:
+            assert self.proc is not None
+            error_code = self.proc.wait(3)
+            # XXX Reconstruct exception from error code
+            raise errors.exception_from_error_code(error_code)  # type: ignore [misc]
+
+    def doc_to_pixels(self, document: Document, tempdir: str) -> None:
+        with open(document.input_filename, "rb") as f:
+            self.proc = self.get_doc_to_pixels_proc()
+            try:
+                assert self.proc.stdin is not None
+                self.proc.stdin.write(f.read())
+                self.proc.stdin.close()
+            except BrokenPipeError as e:
+                raise errors.InterruptedConversion()
+
+            # Get file size (in MiB)
+            size = os.path.getsize(document.input_filename) / 1024**2
+            timeout = calculate_timeout(size) + self.STARTUP_TIME_SECONDS
+
+            assert self.proc is not None
+            assert self.proc.stdout is not None
+            os.set_blocking(self.proc.stdout.fileno(), False)
+
+            n_pages = read_int(self.proc.stdout, timeout)
+            if n_pages == 0 or n_pages > errors.MAX_PAGES:
+                raise errors.MaxPagesException()
+            percentage_per_page = 50.0 / n_pages
+
+            timeout = calculate_timeout(size, n_pages)
+            sw = Stopwatch(timeout)
+            sw.start()
+            for page in range(1, n_pages + 1):
+                text = f"Converting page {page}/{n_pages} to pixels"
+                self.print_progress_trusted(document, False, text, self.percentage)
+
+                width = read_int(self.proc.stdout, timeout=sw.remaining)
+                height = read_int(self.proc.stdout, timeout=sw.remaining)
+                if not (1 <= width <= errors.MAX_PAGE_WIDTH):
+                    raise errors.MaxPageWidthException()
+                if not (1 <= height <= errors.MAX_PAGE_HEIGHT):
+                    raise errors.MaxPageHeightException()
+
+                num_pixels = width * height * 3  # three color channels
+                untrusted_pixels = read_bytes(
+                    self.proc.stdout,
+                    num_pixels,
+                    timeout=sw.remaining,
+                )
+
+                # Wrapper code
+                with open(f"{tempdir}/pixels/page-{page}.width", "w") as f_width:
+                    f_width.write(str(width))
+                with open(f"{tempdir}/pixels/page-{page}.height", "w") as f_height:
+                    f_height.write(str(height))
+                with open(f"{tempdir}/pixels/page-{page}.rgb", "wb") as f_rgb:
+                    f_rgb.write(untrusted_pixels)
+
+                self.percentage += percentage_per_page
+
+        # Ensure nothing else is read after all bitmaps are obtained
+        self.proc.stdout.close()
+
+        # TODO handle leftover code input
+        text = "Converted document to pixels"
+        self.print_progress_trusted(document, False, text, self.percentage)
+
+        if getattr(sys, "dangerzone_dev", False):
+            assert self.proc.stderr is not None
+            os.set_blocking(self.proc.stderr.fileno(), False)
+            untrusted_log = read_debug_text(self.proc.stderr, MAX_CONVERSION_LOG_CHARS)
+            self.proc.stderr.close()
+            log.info(
+                f"Conversion output (doc to pixels)\n{self.sanitize_conversion_str(untrusted_log)}"
+            )
+
+    @abstractmethod
+    def pixels_to_pdf(
+        self, document: Document, tempdir: str, ocr_lang: Optional[str]
+    ) -> None:
+        pass
 
 
 # From global_common:
