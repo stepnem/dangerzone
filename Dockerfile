@@ -16,9 +16,9 @@ RUN apk --no-cache -U upgrade && \
     tesseract-ocr \
     font-noto-cjk
 
-RUN apk add g++ gcc make python3-dev py3-pip
+RUN apk add g++ gcc make python3-dev py3-pip clang-dev
 RUN pip install --upgrade PyMuPDF # FIXME freeze w/ hashes
-RUN apk del g++ gcc make python3-dev py3-pip
+RUN apk del g++ gcc make python3-dev py3-pip clang-dev
 
 # Download the trained models from the latest GitHub release of Tesseract, and
 # store them under /usr/share/tessdata. This is basically what distro packages
