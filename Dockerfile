@@ -6,11 +6,8 @@ ARG H2ORESTART_CHECKSUM=5db816a1e57b510456633f55e693cb5ef3675ef8b35df4f31c90ab9d
 # Install dependencies
 RUN apk --no-cache -U upgrade && \
     apk --no-cache add \
-    ghostscript \
     libreoffice \
     openjdk8 \
-    poppler-utils \
-    poppler-data \
     python3 \
     py3-magic \
     tesseract-ocr \
