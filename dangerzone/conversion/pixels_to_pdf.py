@@ -49,13 +49,13 @@ class PixelsToPDF(DangerzoneConverter):
             page_size = os.path.getsize(filename_base + ".rgb") / 1024**2
             total_size += page_size
             timeout = self.calculate_timeout(page_size, 1)
-
             self.update_progress(
                 f"Converting page {page_num}/{num_pages} from pixels to PDF"
             )
             pixmap = fitz.Pixmap(
                 fitz.Colorspace(fitz.CS_RGB), width, height, untrusted_rgb_data, False
             )
+            pixmap.set_dpi(72, 72)
             if ocr_lang:  # OCR the document
                 try:
                     ocr_pdf_bytes = pixmap.pdfocr_tobytes(
