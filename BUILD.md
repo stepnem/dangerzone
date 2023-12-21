@@ -221,7 +221,7 @@ Overview of the qubes you'll create:
 3. Install the poetry dependencies:
 
    ```
-   poetry install
+   poetry install --with qubes
    ```
 
    > **Note**: due to an issue with
