@@ -140,7 +140,7 @@ class ProcessBasedIsolationProvider(IsolationProvider):
         super().__init__()
 
     @abstractmethod
-    def get_doc_to_pixels_proc(self) -> subprocess.Popen:
+    def start_doc_to_pixels_proc(self) -> subprocess.Popen:
         pass
 
     def _convert(
@@ -163,7 +163,7 @@ class ProcessBasedIsolationProvider(IsolationProvider):
 
     def doc_to_pixels(self, document: Document, tempdir: str) -> None:
         with open(document.input_filename, "rb") as f:
-            self.proc = self.get_doc_to_pixels_proc()
+            self.proc = self.start_doc_to_pixels_proc()
             try:
                 assert self.proc.stdin is not None
                 self.proc.stdin.write(f.read())
