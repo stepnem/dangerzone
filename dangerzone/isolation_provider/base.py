@@ -49,8 +49,11 @@ class IsolationProvider(ABC):
     Abstracts an isolation provider
     """
 
+    STARTUP_TIME_SECONDS = 0  # The maximum time it takes a the provider to start up.
+
     def __init__(self) -> None:
         self.percentage = 0.0
+        self.proc: Optional[subprocess.Popen] = None
 
     @abstractmethod
     def install(self) -> bool:
@@ -65,101 +68,29 @@ class IsolationProvider(ABC):
         self.progress_callback = progress_callback
         document.mark_as_converting()
         try:
-            success = self._convert(document, ocr_lang)
-        except errors.ConversionException as e:
-            success = False
-            self.print_progress_trusted(document, True, str(e), 0)
-        except Exception as e:
-            success = False
-            log.exception(
-                f"An exception occurred while converting document '{document.id}'"
-            )
-            self.print_progress_trusted(document, True, str(e), 0)
-        if success:
-            document.mark_as_safe()
-            if document.archive_after_conversion:
-                document.archive()
-        else:
-            document.mark_as_failed()
-
-    @abstractmethod
-    def _convert(
-        self,
-        document: Document,
-        ocr_lang: Optional[str],
-    ) -> bool:
-        pass
-
-    def _print_progress(
-        self, document: Document, error: bool, text: str, percentage: float
-    ) -> None:
-        s = Style.BRIGHT + Fore.YELLOW + f"[doc {document.id}] "
-        s += Fore.CYAN + f"{percentage}% " + Style.RESET_ALL
-        if error:
-            s += Fore.RED + text + Style.RESET_ALL
-            log.error(s)
-        else:
-            s += text
-            log.info(s)
-
-        if self.progress_callback:
-            self.progress_callback(error, text, percentage)
-
-    def print_progress_trusted(
-        self, document: Document, error: bool, text: str, percentage: float
-    ) -> None:
-        return self._print_progress(document, error, text, int(percentage))
-
-    def print_progress(
-        self, document: Document, error: bool, untrusted_text: str, percentage: float
-    ) -> None:
-        text = replace_control_chars(untrusted_text)
-        return self.print_progress_trusted(
-            document, error, "UNTRUSTED> " + text, percentage
-        )
-
-    @abstractmethod
-    def get_max_parallel_conversions(self) -> int:
-        pass
-
-    def sanitize_conversion_str(self, untrusted_conversion_str: str) -> str:
-        conversion_string = replace_control_chars(untrusted_conversion_str)
-
-        # Add armor (gpg-style)
-        armor_start = f"{DOC_TO_PIXELS_LOG_START}\n"
-        armor_end = DOC_TO_PIXELS_LOG_END
-        return armor_start + conversion_string + armor_end
-
-
-class ProcessBasedIsolationProvider(IsolationProvider):
-    # The maximum time it takes a the provider to start up.
-    STARTUP_TIME_SECONDS = 0
-
-    def __init__(self) -> None:
-        self.proc: Optional[subprocess.Popen] = None
-        super().__init__()
-
-    @abstractmethod
-    def start_doc_to_pixels_proc(self) -> subprocess.Popen:
-        pass
-
-    def _convert(
-        self,
-        document: Document,
-        ocr_lang: Optional[str] = None,
-    ) -> bool:
-        try:
             with tempfile.TemporaryDirectory() as t:
                 Path(f"{t}/pixels").mkdir()
                 self.doc_to_pixels(document, t)
                 # TODO: validate convert to pixels output
                 self.pixels_to_pdf(document, t, ocr_lang)
-                return True
+            document.mark_as_safe()
+            if document.archive_after_conversion:
+                document.archive()
         except errors.InterruptedConversion:
             assert self.proc is not None
             error_code = self.proc.wait(3)
             # XXX Reconstruct exception from error code
-            raise errors.exception_from_error_code(error_code)  # type: ignore [misc]
+            exception = errors.exception_from_error_code(error_code)
+            document.mark_as_failed()
+        except errors.ConversionException as e:
+            self.print_progress_trusted(document, True, str(e), 0)
+            document.mark_as_failed()
+        except Exception as e:
+            log.exception(
+                f"An exception occurred while converting document '{document.id}'"
+            )
+            self.print_progress_trusted(document, True, str(e), 0)
+            document.mark_as_failed()
 
     def doc_to_pixels(self, document: Document, tempdir: str) -> None:
         with open(document.input_filename, "rb") as f:
@@ -235,6 +166,50 @@ class ProcessBasedIsolationProvider(IsolationProvider):
     def pixels_to_pdf(
         self, document: Document, tempdir: str, ocr_lang: Optional[str]
     ) -> None:
+        pass
+
+    def _print_progress(
+        self, document: Document, error: bool, text: str, percentage: float
+    ) -> None:
+        s = Style.BRIGHT + Fore.YELLOW + f"[doc {document.id}] "
+        s += Fore.CYAN + f"{percentage}% " + Style.RESET_ALL
+        if error:
+            s += Fore.RED + text + Style.RESET_ALL
+            log.error(s)
+        else:
+            s += text
+            log.info(s)
+
+        if self.progress_callback:
+            self.progress_callback(error, text, percentage)
+
+    def print_progress_trusted(
+        self, document: Document, error: bool, text: str, percentage: float
+    ) -> None:
+        return self._print_progress(document, error, text, int(percentage))
+
+    def print_progress(
+        self, document: Document, error: bool, untrusted_text: str, percentage: float
+    ) -> None:
+        text = replace_control_chars(untrusted_text)
+        return self.print_progress_trusted(
+            document, error, "UNTRUSTED> " + text, percentage
+        )
+
+    @abstractmethod
+    def get_max_parallel_conversions(self) -> int:
+        pass
+
+    def sanitize_conversion_str(self, untrusted_conversion_str: str) -> str:
+        conversion_string = replace_control_chars(untrusted_conversion_str)
+
+        # Add armor (gpg-style)
+        armor_start = f"{DOC_TO_PIXELS_LOG_START}\n"
+        armor_end = DOC_TO_PIXELS_LOG_END
+        return armor_start + conversion_string + armor_end
+
+    @abstractmethod
+    def start_doc_to_pixels_proc(self) -> subprocess.Popen:
         pass
 
 

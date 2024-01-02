@@ -8,8 +8,8 @@ from colorama import Back, Fore, Style
 from . import args, errors
 from .document import ARCHIVE_SUBDIR, SAFE_EXTENSION
 from .isolation_provider.container import Container
-from .isolation_provider.dummy import Dummy
 from .isolation_provider.qubes import Qubes, is_qubes_native_conversion
+from .isolation_provider.unsafe import UnsafeConverter
 from .logic import DangerzoneCore
 from .util import get_version
 
@@ -34,9 +34,7 @@ def print_header(s: str) -> None:
     flag_value=True,
     help=f"Archives the unsafe version in a subdirectory named '{ARCHIVE_SUBDIR}'",
 )
-@click.option(
-    "--unsafe-dummy-conversion", "dummy_conversion", flag_value=True, hidden=True
-)
+@click.option("--unsafe-conversion", "unsafe_conversion", flag_value=True, hidden=True)
 @click.option(
     "--enable-timeouts / --disable-timeouts",
     default=True,
@@ -58,12 +56,12 @@ def cli_main(
     enable_timeouts: bool,
     filenames: List[str],
     archive: bool,
-    dummy_conversion: bool,
+    unsafe_conversion: bool,
 ) -> None:
     setup_logging()
 
-    if getattr(sys, "dangerzone_dev", False) and dummy_conversion:
-        dangerzone = DangerzoneCore(Dummy())
+    if getattr(sys, "dangerzone_dev", False) and unsafe_conversion:
+        dangerzone = DangerzoneCore(UnsafeConverter())
     elif is_qubes_native_conversion():
         dangerzone = DangerzoneCore(Qubes())
     else:
