@@ -131,8 +131,8 @@ class TestCli:
             # to tokenize it.
             args = (args,)
 
-        if os.environ.get("DUMMY_CONVERSION", False):
-            args = ("--unsafe-dummy-conversion", *args)
+        if os.environ.get("UNSAFE_CONVERSION", False):
+            args = ("--unsafe-conversion", *args)
 
         with tempfile.TemporaryDirectory() as t:
             tmp_dir = Path(t)
@@ -288,11 +288,11 @@ class TestCliConversion(TestCliBasic):
         assert os.path.exists(archived_doc_path)
         assert os.path.exists(safe_doc_path)
 
-    def test_dummy_conversion(self, tmp_path: Path, sample_pdf: str) -> None:
-        result = self.run_cli([sample_pdf, "--unsafe-dummy-conversion"])
+    def test_unsafe_conversion(self, tmp_path: Path, sample_pdf: str) -> None:
+        result = self.run_cli([sample_pdf, "--unsafe-conversion"])
         result.assert_success()
 
-    def test_dummy_conversion_bulk(self, tmp_path: Path, sample_pdf: str) -> None:
+    def test_unsafe_conversion_bulk(self, tmp_path: Path, sample_pdf: str) -> None:
         filenames = ["1.pdf", "2.pdf", "3.pdf"]
         file_paths = []
         for filename in filenames:
@@ -300,10 +300,14 @@ class TestCliConversion(TestCliBasic):
             shutil.copyfile(sample_pdf, doc_path)
             file_paths.append(doc_path)
 
-        result = self.run_cli(["--unsafe-dummy-conversion", *file_paths])
+        result = self.run_cli(["--unsafe-conversion", *file_paths])
         result.assert_success()
 
 
+@pytest.mark.skipif(
+    os.environ.get("UNSAFE_CONVERSION", False),
+    reason="Not running extra formats in unsafe mode since test documents are not trusted",
+)
 class TestExtraFormats(TestCli):
     @for_each_external_doc("*hwp*")
     def test_hancom_office(self, doc: str) -> None:
