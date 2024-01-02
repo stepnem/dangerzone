@@ -26,13 +26,13 @@ class DocumentToPixels(DangerzoneConverter):
     async def write_page_count(self, count: int) -> None:
         return await self.write_int(count)
 
-    async def write_page_width(self, width: int, filename: str) -> None:
+    async def write_page_width(self, width: int) -> None:
         return await self.write_int(width)
 
-    async def write_page_height(self, height: int, filename: str) -> None:
+    async def write_page_height(self, height: int) -> None:
         return await self.write_int(height)
 
-    async def write_page_data(self, data: bytes, filename: str) -> None:
+    async def write_page_data(self, data: bytes) -> None:
         return await self.write_bytes(data)
 
     async def convert(self) -> None:
@@ -220,9 +220,6 @@ class DocumentToPixels(DangerzoneConverter):
         for page in doc.pages():
             # TODO check if page.number is doc-controlled
             page_num = page.number + 1  # pages start in 1
-            rgb_filename = f"{page_base}-{page_num}.rgb"
-            width_filename = f"{page_base}-{page_num}.width"
-            height_filename = f"{page_base}-{page_num}.height"
 
             self.percentage += percentage_per_page
             self.update_progress(
@@ -230,9 +227,9 @@ class DocumentToPixels(DangerzoneConverter):
             )
             pix = page.get_pixmap(dpi=DEFAULT_DPI)
             rgb_buf = pix.samples_mv
-            await self.write_page_width(pix.width, width_filename)
-            await self.write_page_height(pix.height, height_filename)
-            await self.write_page_data(rgb_buf, rgb_filename)
+            await self.write_page_width(pix.width)
+            await self.write_page_height(pix.height)
+            await self.write_page_data(rgb_buf)
 
         self.update_progress("Converted document to pixels")
 
