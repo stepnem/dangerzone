@@ -24,8 +24,8 @@ else:
 from .. import args, errors
 from ..document import Document
 from ..isolation_provider.container import Container
-from ..isolation_provider.dummy import Dummy
 from ..isolation_provider.qubes import Qubes, is_qubes_native_conversion
+from ..isolation_provider.unsafe import UnsafeConverter
 from ..util import get_resource_path, get_version
 from .logic import DangerzoneGui
 from .main_window import MainWindow
@@ -93,9 +93,7 @@ class Application(QtWidgets.QApplication):
 
 
 @click.command()
-@click.option(
-    "--unsafe-dummy-conversion", "dummy_conversion", flag_value=True, hidden=True
-)
+@click.option("--unsafe-conversion", "unsafe_conversion", flag_value=True, hidden=True)
 @click.option(
     "--enable-timeouts / --disable-timeouts",
     default=True,
@@ -112,7 +110,7 @@ class Application(QtWidgets.QApplication):
 @click.version_option(version=get_version(), message="%(version)s")
 @errors.handle_document_errors
 def gui_main(
-    dummy_conversion: bool, filenames: Optional[List[str]], enable_timeouts: bool
+    unsafe_conversion: bool, filenames: Optional[List[str]], enable_timeouts: bool
 ) -> bool:
     setup_logging()
 
@@ -131,9 +129,9 @@ def gui_main(
     app = Application()
 
     # Common objects
-    if getattr(sys, "dangerzone_dev", False) and dummy_conversion:
-        dummy = Dummy()
-        dangerzone = DangerzoneGui(app, isolation_provider=dummy)
+    if getattr(sys, "dangerzone_dev", False) and unsafe_conversion:
+        unsafe_converter = UnsafeConverter()
+        dangerzone = DangerzoneGui(app, isolation_provider=unsafe_converter)
     elif is_qubes_native_conversion():
         qubes = Qubes()
         dangerzone = DangerzoneGui(app, isolation_provider=qubes)

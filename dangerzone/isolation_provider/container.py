@@ -17,7 +17,7 @@ from ..util import (
     get_tmp_dir,
     replace_control_chars,
 )
-from .base import ProcessBasedIsolationProvider
+from .base import IsolationProvider
 
 # Define startupinfo for subprocesses
 if platform.system() == "Windows":
@@ -35,7 +35,7 @@ class NoContainerTechException(Exception):
         super().__init__(f"{container_tech} is not installed")
 
 
-class Container(ProcessBasedIsolationProvider):
+class Container(IsolationProvider):
     # Name of the dangerzone container
     CONTAINER_NAME = "dangerzone.rocks/dangerzone"
     STARTUP_TIME_SECONDS = 5
