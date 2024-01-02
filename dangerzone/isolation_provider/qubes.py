@@ -15,16 +15,12 @@ from ..conversion.common import running_on_qubes
 from ..conversion.pixels_to_pdf import PixelsToPDF
 from ..document import Document
 from ..util import get_resource_path
-from .base import (
-    PIXELS_TO_PDF_LOG_END,
-    PIXELS_TO_PDF_LOG_START,
-    ProcessBasedIsolationProvider,
-)
+from .base import PIXELS_TO_PDF_LOG_END, PIXELS_TO_PDF_LOG_START, IsolationProvider
 
 log = logging.getLogger(__name__)
 
 
-class Qubes(ProcessBasedIsolationProvider):
+class Qubes(IsolationProvider):
     """Uses a disposable qube for performing the conversion"""
 
     STARTUP_TIME_SECONDS = 5 * 60  # 5 minutes
