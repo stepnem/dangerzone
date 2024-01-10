@@ -1,4 +1,4 @@
-from typing import List, Optional, Type
+from typing import List, Optional, Type, Union
 
 # XXX: errors start at 128 for conversion-related issues
 ERROR_SHIFT = 128
@@ -100,7 +100,9 @@ class UnexpectedConversionError(ConversionException):
     error_message = "Some unexpected error occurred while converting the document"
 
 
-def exception_from_error_code(error_code: int) -> ConversionException | ValueError:
+def exception_from_error_code(
+    error_code: int,
+) -> Union[ConversionException, ValueError]:
     """returns the conversion exception corresponding to the error code"""
     for cls in ConversionException.get_subclasses():
         if cls.error_code == error_code:
