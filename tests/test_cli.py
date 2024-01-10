@@ -305,7 +305,7 @@ class TestCliConversion(TestCliBasic):
 
 
 @pytest.mark.skipif(
-    os.environ.get("UNSAFE_CONVERSION", False),
+    os.environ.get("UNSAFE_CONVERSION", False) == "true",
     reason="Not running extra formats in unsafe mode since test documents are not trusted",
 )
 class TestExtraFormats(TestCli):
