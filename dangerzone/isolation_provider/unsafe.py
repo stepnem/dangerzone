@@ -36,7 +36,7 @@ class UnsafeConverter(Qubes):
         return subprocess.Popen(
             # XXX The unsafe converter bypasses the isolation provider by calling
             # the Qubes server component directly
-            [Path(__file__).parent.parent.parent / "qubes" / "dz.ConvertDev"],
+            [Path(__file__).parent.parent.parent / "qubes" / "dz.Convert"],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
