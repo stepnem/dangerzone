@@ -10,7 +10,7 @@ from dangerzone import util
 from dangerzone.gui import Application
 from dangerzone.gui.logic import DangerzoneGui
 from dangerzone.gui.updater import UpdaterThread
-from dangerzone.isolation_provider.unsafe import UnsafeConverter
+from dangerzone.isolation_provider.dummy import Dummy
 
 
 def get_qt_app() -> Application:
@@ -31,14 +31,14 @@ def generate_isolated_updater(
     else:
         app = get_qt_app()
 
-    unsafe_converter = UnsafeConverter()
+    dummy = Dummy()
     # XXX: We can monkey-patch global state without wrapping it in a context manager, or
     # worrying that it will leak between tests, for two reasons:
     #
     # 1. Parallel tests in PyTest take place in different processes.
     # 2. The monkeypatch fixture tears down the monkey-patch after each test ends.
     monkeypatch.setattr(util, "get_config_dir", lambda: tmp_path)
-    dangerzone = DangerzoneGui(app, isolation_provider=unsafe_converter)
+    dangerzone = DangerzoneGui(app, isolation_provider=dummy)
     updater = UpdaterThread(dangerzone)
     return updater
 

@@ -20,8 +20,8 @@ from .. import (
 
 
 @pytest.mark.skipif(
-    os.environ.get("UNSAFE_CONVERSION", False),
-    reason="unsafe conversions not supported",
+    os.environ.get("DUMMY_CONVERSION", False),
+    reason="dummy conversions not supported",
 )
 @pytest.mark.skipif(not running_on_qubes(), reason="Not on a Qubes system")
 class IsolationProviderTest:
