@@ -34,7 +34,7 @@ def read_bytes(f: IO[bytes], size: int, timeout: float, exact: bool = True) -> b
 def read_int(f: IO[bytes], timeout: float) -> int:
     """Read 2 bytes from a file-like object, and decode them as int."""
     untrusted_int = read_bytes(f, 2, timeout)
-    return int.from_bytes(untrusted_int, signed=False)
+    return int.from_bytes(untrusted_int, "big", signed=False)
 
 
 def read_debug_text(f: IO[bytes], size: int) -> str:
