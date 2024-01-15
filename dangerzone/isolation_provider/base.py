@@ -55,6 +55,11 @@ class IsolationProvider(ABC):
         self.percentage = 0.0
         self.proc: Optional[subprocess.Popen] = None
 
+        if getattr(sys, "dangerzone_dev", False) == True:
+            self.proc_stderr = subprocess.PIPE
+        else:
+            self.proc_stderr = subprocess.DEVNULL
+
     @abstractmethod
     def install(self) -> bool:
         pass
