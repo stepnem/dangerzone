@@ -166,17 +166,11 @@ class Container(IsolationProvider):
         args_str = " ".join(shlex.quote(s) for s in args)
         log.info("> " + args_str)
 
-        dev_mode = getattr(sys, "dangerzone_dev", False) == True
-        if dev_mode:
-            stderr = subprocess.PIPE
-        else:
-            stderr = subprocess.DEVNULL
-
         return subprocess.Popen(
             args,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
-            stderr=stderr,
+            stderr=self.proc_stderr,
             startupinfo=startupinfo,
         )
 
