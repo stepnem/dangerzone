@@ -1,10 +1,6 @@
 version: 2.1
 
 aliases:
-  - &install-podman
-    name: Install Podman in Ubuntu Focal
-    command: ./install/linux/install-podman-ubuntu-focal.sh
-
     # FIXME: Remove the following step once we drop Ubuntu Focal support. The
     # python-all dependency is an artificial requirement due to an stdeb bug
     # prior to v0.9.1. See:
@@ -23,12 +19,12 @@ aliases:
     command: |
       export DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true
       apt-get update
-      apt-get install -y dh-python python3 python3-stdeb
+      apt-get install -y podman newuidmap dh-python python3 python3-stdeb
 
   - &install-dependencies-rpm
     name: Install dependencies (rpm)
     command: |
-      dnf install -y rpm-build python3 python3-devel python3-poetry-core pipx
+      dnf install -y podman rpm-build python3 python3-devel python3-poetry-core pipx
       pipx install poetry
 
   - &build-deb
@@ -96,10 +92,9 @@ jobs:
 
   build-container-image:
     machine:
-      image: ubuntu-2004:202111-01
+      image: default
     steps:
       - checkout
-      - run: *install-podman
       - run:
           name: Prepare cache directory
           command: |
@@ -137,10 +132,9 @@ jobs:
 
   convert-test-docs:
     machine:
-      image: ubuntu-2004:202111-01
+      image: default
     steps:
       - checkout
-      - run: *install-podman
       - run:
           name: Install poetry dependencies
           command: |
@@ -151,7 +145,7 @@ jobs:
       - run:
           name: Install test dependencies
           command: |
-            sudo apt-get install -y libqt5gui5 libxcb-cursor0 --no-install-recommends
+            sudo apt-get install -y podman libqt5gui5 libxcb-cursor0 --no-install-recommends
       - run:
           name: Prepare cache directory
           command: |
@@ -167,10 +161,9 @@ jobs:
 
   ci-ubuntu-mantic:
     machine:
-      image: ubuntu-2004:202111-01
+      image: default
     steps:
       - checkout
-      - run: *install-podman
 
       - run:
           name: Prepare cache directory
@@ -194,10 +187,9 @@ jobs:
 
   ci-ubuntu-lunar:
     machine:
-      image: ubuntu-2004:202111-01
+      image: default
     steps:
       - checkout
-      - run: *install-podman
 
       - run:
           name: Prepare cache directory
@@ -221,10 +213,9 @@ jobs:
 
   ci-ubuntu-jammy:
     machine:
-      image: ubuntu-2004:202111-01
+      image: default
     steps:
       - checkout
-      - run: *install-podman
 
       - run:
           name: Prepare cache directory
@@ -248,10 +239,9 @@ jobs:
 
   ci-ubuntu-focal:
     machine:
-      image: ubuntu-2004:202111-01
+      image: default
     steps:
       - checkout
-      - run: *install-podman
 
       - run:
           name: Prepare cache directory
@@ -275,10 +265,9 @@ jobs:
 
   ci-fedora-38:
     machine:
-      image: ubuntu-2004:202111-01
+      image: default
     steps:
       - checkout
-      - run: *install-podman
 
       - run:
           name: Prepare cache directory
@@ -302,10 +291,9 @@ jobs:
 
   ci-debian-trixie:
     machine:
-      image: ubuntu-2004:202111-01
+      image: default
     steps:
       - checkout
-      - run: *install-podman
 
       - run:
           name: Prepare cache directory
@@ -329,10 +317,9 @@ jobs:
 
   ci-debian-bookworm:
     machine:
-      image: ubuntu-2004:202111-01
+      image: default
     steps:
       - checkout
-      - run: *install-podman
 
       - run:
           name: Prepare cache directory
@@ -361,10 +348,9 @@ jobs:
   # https://github.com/freedomofpress/dangerzone/issues/388
   ci-debian-bullseye:
     machine:
-      image: ubuntu-2204:2023.04.2
+      image: default
     steps:
       - checkout
-      - run: *install-podman
       - run:
           name: Configure Podman for Ubuntu 22.04
           command: |
