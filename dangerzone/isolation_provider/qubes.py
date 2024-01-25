@@ -23,10 +23,6 @@ log = logging.getLogger(__name__)
 class Qubes(IsolationProvider):
     """Uses a disposable qube for performing the conversion"""
 
-    def __init__(self) -> None:
-        self.proc: Optional[subprocess.Popen] = None
-        super().__init__()
-
     def install(self) -> bool:
         return True
 

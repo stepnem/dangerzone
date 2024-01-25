@@ -27,7 +27,7 @@ def read_bytes(f: IO[bytes], size: int, exact: bool = True) -> bytes:
     """Read bytes from a file-like object."""
     buf = f.read(size)
     if exact and len(buf) != size:
-        raise errors.ConverterProcException()
+        raise errors.InterruptedConversionException()
     return buf
 
 
@@ -35,7 +35,7 @@ def read_int(f: IO[bytes]) -> int:
     """Read 2 bytes from a file-like object, and decode them as int."""
     untrusted_int = f.read(INT_BYTES)
     if len(untrusted_int) != INT_BYTES:
-        raise errors.ConverterProcException()
+        raise errors.InterruptedConversionException()
     return int.from_bytes(untrusted_int, "big", signed=False)
 
 
@@ -52,7 +52,6 @@ class IsolationProvider(ABC):
 
     def __init__(self) -> None:
         self.percentage = 0.0
-        self.proc: Optional[subprocess.Popen] = None
 
         if getattr(sys, "dangerzone_dev", False) == True:
             self.proc_stderr = subprocess.PIPE
@@ -80,8 +79,8 @@ class IsolationProvider(ABC):
             document.mark_as_safe()
             if document.archive_after_conversion:
                 document.archive()
-        except errors.ConverterProcException:
-            exception = self.get_proc_exception()
+        except errors.ConverterProcException as e:
+            exception = self.get_proc_exception(e.proc)
             self.print_progress(document, True, str(exception), 0)
             document.mark_as_failed()
         except errors.ConversionException as e:
@@ -96,16 +95,16 @@ class IsolationProvider(ABC):
 
     def doc_to_pixels(self, document: Document, tempdir: str) -> None:
         with open(document.input_filename, "rb") as f:
-            self.proc = self.start_doc_to_pixels_proc()
+            p = self.start_doc_to_pixels_proc()
             try:
-                assert self.proc.stdin is not None
-                self.proc.stdin.write(f.read())
-                self.proc.stdin.close()
+                assert p.stdin is not None
+                p.stdin.write(f.read())
+                p.stdin.close()
             except BrokenPipeError as e:
-                raise errors.ConverterProcException()
+                raise errors.ConverterProcException(p)
 
-            assert self.proc.stdout
-            n_pages = read_int(self.proc.stdout)
+            assert p.stdout
+            n_pages = read_int(p.stdout)
             if n_pages == 0 or n_pages > errors.MAX_PAGES:
                 raise errors.MaxPagesException()
             percentage_per_page = 50.0 / n_pages
@@ -114,8 +113,8 @@ class IsolationProvider(ABC):
                 text = f"Converting page {page}/{n_pages} to pixels"
                 self.print_progress(document, False, text, self.percentage)
 
-                width = read_int(self.proc.stdout)
-                height = read_int(self.proc.stdout)
+                width = read_int(p.stdout)
+                height = read_int(p.stdout)
                 if not (1 <= width <= errors.MAX_PAGE_WIDTH):
                     raise errors.MaxPageWidthException()
                 if not (1 <= height <= errors.MAX_PAGE_HEIGHT):
@@ -123,7 +122,7 @@ class IsolationProvider(ABC):
 
                 num_pixels = width * height * 3  # three color channels
                 untrusted_pixels = read_bytes(
-                    self.proc.stdout,
+                    p.stdout,
                     num_pixels,
                 )
 
@@ -138,16 +137,16 @@ class IsolationProvider(ABC):
                 self.percentage += percentage_per_page
 
         # Ensure nothing else is read after all bitmaps are obtained
-        self.proc.stdout.close()
+        p.stdout.close()
 
         # TODO handle leftover code input
         text = "Converted document to pixels"
         self.print_progress(document, False, text, self.percentage)
 
         if getattr(sys, "dangerzone_dev", False):
-            assert self.proc.stderr
-            untrusted_log = read_debug_text(self.proc.stderr, MAX_CONVERSION_LOG_CHARS)
-            self.proc.stderr.close()
+            assert p.stderr
+            untrusted_log = read_debug_text(p.stderr, MAX_CONVERSION_LOG_CHARS)
+            p.stderr.close()
             log.info(
                 f"Conversion output (doc to pixels)\n{self.sanitize_conversion_str(untrusted_log)}"
             )
@@ -173,10 +172,9 @@ class IsolationProvider(ABC):
         if self.progress_callback:
             self.progress_callback(error, text, percentage)
 
-    def get_proc_exception(self) -> Exception:
+    def get_proc_exception(self, p: subprocess.Popen) -> Exception:
         """Returns an exception associated with a process exit code"""
-        assert self.proc
-        error_code = self.proc.wait(3)
+        error_code = p.wait(3)
         return errors.exception_from_error_code(error_code)
 
     @abstractmethod
