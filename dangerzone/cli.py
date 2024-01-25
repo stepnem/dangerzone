@@ -39,9 +39,9 @@ def print_header(s: str) -> None:
 )
 @click.option(
     "--enable-timeouts / --disable-timeouts",
-    default=True,
+    default=False,
     show_default=True,
-    help="Enable/Disable timeouts during document conversion",
+    help="(DEPRECATED - timeouts were removed) Enable/Disable timeouts during document conversion",
 )
 @click.argument(
     "filenames",
@@ -67,7 +67,7 @@ def cli_main(
     elif is_qubes_native_conversion():
         dangerzone = DangerzoneCore(Qubes())
     else:
-        dangerzone = DangerzoneCore(Container(enable_timeouts=enable_timeouts))
+        dangerzone = DangerzoneCore(Container())
 
     display_banner()
     if len(filenames) == 1 and output_filename:

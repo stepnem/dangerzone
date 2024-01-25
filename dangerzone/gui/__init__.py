@@ -100,7 +100,7 @@ class Application(QtWidgets.QApplication):
     "--enable-timeouts / --disable-timeouts",
     default=True,
     show_default=True,
-    help="Enable/Disable timeouts during document conversion",
+    help="(DEPRECATED - timeouts were removed) Enable/Disable timeouts during document conversion",
 )
 @click.argument(
     "filenames",
@@ -138,7 +138,7 @@ def gui_main(
         qubes = Qubes()
         dangerzone = DangerzoneGui(app, isolation_provider=qubes)
     else:
-        container = Container(enable_timeouts=enable_timeouts)
+        container = Container()
         dangerzone = DangerzoneGui(app, isolation_provider=container)
 
     # Allow Ctrl-C to smoothly quit the program instead of throwing an exception

@@ -23,8 +23,6 @@ log = logging.getLogger(__name__)
 class Qubes(IsolationProvider):
     """Uses a disposable qube for performing the conversion"""
 
-    STARTUP_TIME_SECONDS = 5 * 60  # 5 minutes
-
     def __init__(self) -> None:
         self.proc: Optional[subprocess.Popen] = None
         super().__init__()
