@@ -37,12 +37,6 @@ def print_header(s: str) -> None:
 @click.option(
     "--unsafe-dummy-conversion", "dummy_conversion", flag_value=True, hidden=True
 )
-@click.option(
-    "--enable-timeouts / --disable-timeouts",
-    default=False,
-    show_default=True,
-    help="(DEPRECATED - timeouts were removed) Enable/Disable timeouts during document conversion",
-)
 @click.argument(
     "filenames",
     required=True,
@@ -55,7 +49,6 @@ def print_header(s: str) -> None:
 def cli_main(
     output_filename: Optional[str],
     ocr_lang: Optional[str],
-    enable_timeouts: bool,
     filenames: List[str],
     archive: bool,
     dummy_conversion: bool,

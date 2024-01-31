@@ -96,12 +96,6 @@ class Application(QtWidgets.QApplication):
 @click.option(
     "--unsafe-dummy-conversion", "dummy_conversion", flag_value=True, hidden=True
 )
-@click.option(
-    "--enable-timeouts / --disable-timeouts",
-    default=True,
-    show_default=True,
-    help="(DEPRECATED - timeouts were removed) Enable/Disable timeouts during document conversion",
-)
 @click.argument(
     "filenames",
     required=False,
@@ -111,9 +105,7 @@ class Application(QtWidgets.QApplication):
 )
 @click.version_option(version=get_version(), message="%(version)s")
 @errors.handle_document_errors
-def gui_main(
-    dummy_conversion: bool, filenames: Optional[List[str]], enable_timeouts: bool
-) -> bool:
+def gui_main(dummy_conversion: bool, filenames: Optional[List[str]]) -> bool:
     setup_logging()
 
     if platform.system() == "Darwin":

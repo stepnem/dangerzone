@@ -35,7 +35,7 @@ class Qubes(IsolationProvider):
         converter = PixelsToPDF(progress_callback=print_progress_wrapper)
         try:
             asyncio.run(converter.convert(ocr_lang, tempdir))
-        except (RuntimeError, TimeoutError, ValueError) as e:
+        except (RuntimeError, ValueError) as e:
             raise errors.UnexpectedConversionError(str(e))
         finally:
             if getattr(sys, "dangerzone_dev", False):
