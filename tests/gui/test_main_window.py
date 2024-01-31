@@ -30,8 +30,8 @@ from .test_updater import assert_report_equal, default_updater_settings
 def content_widget(qtbot: QtBot, mocker: MockerFixture) -> ContentWidget:
     # Setup
     mock_app = mocker.MagicMock()
-    unsafe_converter = mocker.MagicMock()
-    dz = DangerzoneGui(mock_app, unsafe_converter)
+    dummy = mocker.MagicMock()
+    dz = DangerzoneGui(mock_app, dummy)
     w = ContentWidget(dz)
     qtbot.addWidget(w)
     return w
