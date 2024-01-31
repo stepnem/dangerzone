@@ -694,6 +694,12 @@ class Env:
         # Populate the build context.
         shutil.copy(package_src, package_dst)
         shutil.copy(git_root() / "dev_scripts" / "storage.conf", build_dir)
+        if self.distro in ("debian", "ubuntu"):
+            shutil.copy(git_root() / "dev_scripts" / "oldstable-pu.pref", build_dir)
+            shutil.copy(
+                git_root() / "dev_scripts" / f"oldstable-pu-{self.distro}.sources",
+                build_dir / "oldstable-pu.sources",
+            )
         with open(build_dir / "Dockerfile", mode="w") as f:
             f.write(dockerfile)
 
