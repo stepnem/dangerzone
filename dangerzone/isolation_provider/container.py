@@ -250,7 +250,7 @@ class Container(IsolationProvider):
         return self.exec_container(command)
 
     def get_max_parallel_conversions(self) -> int:
-        # FIXME hardcoded 1 until lenght conversions are better handled
+        # FIXME hardcoded 1 until length conversions are better handled
         # https://github.com/freedomofpress/dangerzone/issues/257
         return 1
 
