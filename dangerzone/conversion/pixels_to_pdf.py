@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+
 """
 Here are the steps, with progress bar percentages:
 

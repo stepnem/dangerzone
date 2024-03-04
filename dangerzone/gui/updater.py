@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 """A module that contains the logic for checking for updates."""
 
 import json

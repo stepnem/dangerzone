@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import concurrent.futures
 import gzip
 import json

@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import subprocess
 from typing import List, Optional, Type, Union
 
