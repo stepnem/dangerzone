@@ -204,42 +204,6 @@ class Container(IsolationProvider):
         args = [container_runtime] + args
         return self.exec(args)
 
-    def pixels_to_pdf(
-        self, document: Document, tempdir: str, ocr_lang: Optional[str]
-    ) -> None:
-        # Convert pixels to safe PDF
-        command = [
-            "/usr/bin/python3",
-            "-m",
-            "dangerzone.conversion.pixels_to_pdf",
-        ]
-        extra_args = [
-            "-v",
-            f"{tempdir}:/safezone:Z",
-            "-e",
-            f"OCR={0 if ocr_lang is None else 1}",
-            "-e",
-            f"OCR_LANGUAGE={ocr_lang}",
-        ]
-
-        pixels_to_pdf_proc = self.exec_container(command, extra_args)
-        if pixels_to_pdf_proc.stdout:
-            for line in pixels_to_pdf_proc.stdout:
-                self.parse_progress_trusted(document, line.decode())
-        error_code = pixels_to_pdf_proc.wait()
-        if error_code != 0:
-            log.error("pixels-to-pdf failed")
-            raise errors.exception_from_error_code(error_code)
-        else:
-            # Move the final file to the right place
-            if os.path.exists(document.output_filename):
-                os.remove(document.output_filename)
-
-            container_output_filename = os.path.join(
-                tempdir, "safe-output-compressed.pdf"
-            )
-            shutil.move(container_output_filename, document.output_filename)
-
     def start_doc_to_pixels_proc(self) -> subprocess.Popen:
         # Convert document to pixels
         command = [

@@ -11,6 +11,7 @@ from colorama import Fore, Style
 
 from ..conversion import errors
 from ..conversion.common import INT_BYTES
+from ..conversion.pixels_to_pdf import PixelsToPDF
 from ..document import Document
 from ..util import replace_control_chars
 
@@ -72,10 +73,16 @@ class IsolationProvider(ABC):
             conversion_proc = self.start_doc_to_pixels_proc()
             with tempfile.TemporaryDirectory() as t:
                 Path(f"{t}/pixels").mkdir()
-                self.doc_to_pixels(document, t, conversion_proc)
-                conversion_proc.wait(3)
-                # TODO: validate convert to pixels output
-                self.pixels_to_pdf(document, t, ocr_lang)
+                try:
+                    self._convert(document, t, ocr_lang, conversion_proc)
+                finally:
+                    if getattr(sys, "dangerzone_dev", False):
+                        assert conversion_proc.stderr
+                        untrusted_log = read_debug_text(conversion_proc.stderr, MAX_CONVERSION_LOG_CHARS)
+                        conversion_proc.stderr.close()
+                        log.info(
+                            f"Conversion output (doc to pixels)\n{self.sanitize_conversion_str(untrusted_log)}"
+                        )
             document.mark_as_safe()
             if document.archive_after_conversion:
                 document.archive()
@@ -93,8 +100,12 @@ class IsolationProvider(ABC):
             self.print_progress(document, True, str(e), 0)
             document.mark_as_failed()
 
-    def doc_to_pixels(
-        self, document: Document, tempdir: str, p: subprocess.Popen
+    def _convert(
+        self,
+        document: Document,
+        tempdir: str,
+        ocr_lang: Optional[str],
+        p: subprocess.Popen,
     ) -> None:
         percentage = 0.0
         with open(document.input_filename, "rb") as f:
@@ -109,7 +120,10 @@ class IsolationProvider(ABC):
             n_pages = read_int(p.stdout)
             if n_pages == 0 or n_pages > errors.MAX_PAGES:
                 raise errors.MaxPagesException()
-            percentage_per_page = 49.0 / n_pages
+            percentage_per_page = 100 / n_pages
+
+            pix_converter = PixelsToPDF()
+            pix_converter.convert_start()
 
             for page in range(1, n_pages + 1):
                 text = f"Converting page {page}/{n_pages} to pixels"
@@ -128,36 +142,23 @@ class IsolationProvider(ABC):
                     num_pixels,
                 )
 
-                # Wrapper code
-                with open(f"{tempdir}/pixels/page-{page}.width", "w") as f_width:
-                    f_width.write(str(width))
-                with open(f"{tempdir}/pixels/page-{page}.height", "w") as f_height:
-                    f_height.write(str(height))
-                with open(f"{tempdir}/pixels/page-{page}.rgb", "wb") as f_rgb:
-                    f_rgb.write(untrusted_pixels)
-
+                # FIXME: We need to pause the stopwatch here.
+                pix_converter.convert_next_page(
+                    untrusted_pixels,
+                    width,
+                    height,
+                    ocr_lang,
+                )
                 percentage += percentage_per_page
 
         # Ensure nothing else is read after all bitmaps are obtained
         p.stdout.close()
 
+        pix_converter.convert_finalize(document.output_filename)
+
         # TODO handle leftover code input
-        text = "Converted document to pixels"
+        text = "Converted document"
         self.print_progress(document, False, text, percentage)
-
-        if getattr(sys, "dangerzone_dev", False):
-            assert p.stderr
-            untrusted_log = read_debug_text(p.stderr, MAX_CONVERSION_LOG_CHARS)
-            p.stderr.close()
-            log.info(
-                f"Conversion output (doc to pixels)\n{self.sanitize_conversion_str(untrusted_log)}"
-            )
-
-    @abstractmethod
-    def pixels_to_pdf(
-        self, document: Document, tempdir: str, ocr_lang: Optional[str]
-    ) -> None:
-        pass
 
     def print_progress(
         self, document: Document, error: bool, text: str, percentage: float
@@ -194,75 +195,3 @@ class IsolationProvider(ABC):
     @abstractmethod
     def start_doc_to_pixels_proc(self) -> subprocess.Popen:
         pass
-
-
-# From global_common:
-
-# def validate_convert_to_pixel_output(self, common, output):
-#     """
-#     Take the output from the convert to pixels tasks and validate it. Returns
-#     a tuple like: (success (boolean), error_message (str))
-#     """
-#     max_image_width = 10000
-#     max_image_height = 10000
-
-#     # Did we hit an error?
-#     for line in output.split("\n"):
-#         if (
-#             "failed:" in line
-#             or "The document format is not supported" in line
-#             or "Error" in line
-#         ):
-#             return False, output
-
-#     # How many pages was that?
-#     num_pages = None
-#     for line in output.split("\n"):
-#         if line.startswith("Document has "):
-#             num_pages = line.split(" ")[2]
-#             break
-#     if not num_pages or not num_pages.isdigit() or int(num_pages) <= 0:
-#         return False, "Invalid number of pages returned"
-#     num_pages = int(num_pages)
-
-#     # Make sure we have the files we expect
-#     expected_filenames = []
-#     for i in range(1, num_pages + 1):
-#         expected_filenames += [
-#             f"page-{i}.rgb",
-#             f"page-{i}.width",
-#             f"page-{i}.height",
-#         ]
-#     expected_filenames.sort()
-#     actual_filenames = os.listdir(common.pixel_dir.name)
-#     actual_filenames.sort()
-
-#     if expected_filenames != actual_filenames:
-#         return (
-#             False,
-#             f"We expected these files:\n{expected_filenames}\n\nBut we got these files:\n{actual_filenames}",
-#         )
-
-#     # Make sure the files are the correct sizes
-#     for i in range(1, num_pages + 1):
-#         with open(f"{common.pixel_dir.name}/page-{i}.width") as f:
-#             w_str = f.read().strip()
-#         with open(f"{common.pixel_dir.name}/page-{i}.height") as f:
-#             h_str = f.read().strip()
-#         w = int(w_str)
-#         h = int(h_str)
-#         if (
-#             not w_str.isdigit()
-#             or not h_str.isdigit()
-#             or w <= 0
-#             or w > max_image_width
-#             or h <= 0
-#             or h > max_image_height
-#         ):
-#             return False, f"Page {i} has invalid geometry"
-
-#         # Make sure the RGB file is the correct size
-#         if os.path.getsize(f"{common.pixel_dir.name}/page-{i}.rgb") != w * h * 3:
-#             return False, f"Page {i} has an invalid RGB file size"
-
-#     return True, True
