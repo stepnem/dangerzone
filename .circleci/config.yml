@@ -133,7 +133,9 @@ jobs:
           key: v1-{{ checksum "Dockerfile" }}-{{ checksum "/caches/cache-id.txt" }}
           paths:
             - /caches/container.tar.gz
-            - /caches/image-id.txt
+      - run:
+          name: Download tessdata
+          command: python3 ./install/common/download-tessdata.py
 
   convert-test-docs:
     machine:

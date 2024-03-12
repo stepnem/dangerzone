@@ -1,3 +1,5 @@
+import hashlib
+import io
 import json
 import pathlib
 import re
@@ -29,20 +31,25 @@ def main():
         releases = json.loads(resp)
         tag = releases["tag_name"]
 
-    # FIXME: Check against hash.
-
+    print(f"> Downloading tessdata release {tag}", file=sys.stderr)
     archive_url = TESSDATA_ARCHIVE_URL.format(tessdata_version=tag)
     with urllib.request.urlopen(archive_url) as f:
-        with tarfile.open(mode="r|*", fileobj=f) as t:
+        archive = f.read()
+        digest = hashlib.sha256(archive).hexdigest()
+        if digest != TESSDATA_CHECKSUM:
+            raise RuntimeError(f"Checksum mismatch {digest} != {TESSDATA_CHECKSUM}")
 
-            def filter_traineddata(tarinfo: tarfile.TarInfo, path: str):
-                regex = rf"tessdata_fast-{tag}/[a-z_]+.traineddata"
-                if re.match(regex, tarinfo.name):
-                    new_name = tarinfo.name.split("/")[1]
-                    print(f"Extracting {new_name}")
-                    return tarinfo.replace(name=new_name)
+    print(f"> Extracting tessdata archive into {tessdata_dir}", file=sys.stderr)
+    with tarfile.open(fileobj=io.BytesIO(archive)) as t:
+        def filter_traineddata(tarinfo: tarfile.TarInfo, path: str):
+            tarinfo = tarfile.data_filter(tarinfo, path)
+            regex = rf"^tessdata_fast-{tag}/[a-z_]+.traineddata$"
+            if re.match(regex, tarinfo.name):
+                new_name = tarinfo.name.split("/")[1]
+                print(f">> Extracting {new_name} into {tessdata_dir}")
+                return tarinfo.replace(name=new_name)
 
-            t.extractall(path=tessdata_dir, filter=filter_traineddata)
+        t.extractall(path=tessdata_dir, filter=filter_traineddata)
 
 
 if __name__ == "__main__":
