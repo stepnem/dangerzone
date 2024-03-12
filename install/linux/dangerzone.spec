@@ -72,12 +72,14 @@ BuildRequires:  python3-devel
 %if 0%{?_qubes}
 # Qubes-only requirements (server-side)
 Requires:       python3-magic
-Requires:       python3-PyMuPDF
 Requires:       libreoffice
 %else
 # Container-only requirements
 Requires:       podman
 %endif
+
+# FIXME: Is it autodetected?
+Requires:       python3-PyMuPDF
 
 # Explicitly require every tesseract model:
 # See: https://github.com/freedomofpress/dangerzone/issues/431

@@ -8,12 +8,12 @@ from pathlib import Path
 from typing import IO, Callable, Optional
 
 from colorama import Fore, Style
+import fitz
 
 from ..conversion import errors
-from ..conversion.common import INT_BYTES
-from ..conversion.pixels_to_pdf import PixelsToPDF
+from ..conversion.common import INT_BYTES, DEFAULT_DPI
 from ..document import Document
-from ..util import replace_control_chars
+from ..util import replace_control_chars, get_tessdata_dir
 
 log = logging.getLogger(__name__)
 
@@ -78,6 +78,12 @@ class IsolationProvider(ABC):
                 finally:
                     if getattr(sys, "dangerzone_dev", False):
                         assert conversion_proc.stderr
+                        try:
+                            conversion_proc.wait(3)
+                        except subprocess.TimeoutExpired:
+                            log.debug("Conversion command is still running")
+                            raise
+
                         untrusted_log = read_debug_text(conversion_proc.stderr, MAX_CONVERSION_LOG_CHARS)
                         conversion_proc.stderr.close()
                         log.info(
@@ -100,6 +106,36 @@ class IsolationProvider(ABC):
             self.print_progress(document, True, str(e), 0)
             document.mark_as_failed()
 
+    def _pixels_to_pdf(
+        self,
+        untrusted_data: bytes,
+        untrusted_width: int,
+        untrusted_height: int,
+        ocr_lang: Optional[str],
+    ) -> None:
+        """Convert a byte array of RGB pixels into a PDF page, optionally with OCR."""
+        pixmap = fitz.Pixmap(
+            fitz.Colorspace(fitz.CS_RGB),
+            untrusted_width,
+            untrusted_height,
+            untrusted_data,
+            False,
+        )
+        pixmap.set_dpi(DEFAULT_DPI, DEFAULT_DPI)
+
+        if ocr_lang:  # OCR the document
+            page_pdf_bytes = pixmap.pdfocr_tobytes(
+                compress=True,
+                language=ocr_lang,
+                tessdata=get_tessdata_dir(),
+            )
+        else:  # Don't OCR
+            page_doc = fitz.Document()
+            page_doc.insert_file(pixmap)
+            page_pdf_bytes = page_doc.tobytes(deflate_images=True)
+
+        return fitz.open("pdf", page_pdf_bytes)
+
     def _convert(
         self,
         document: Document,
@@ -120,13 +156,13 @@ class IsolationProvider(ABC):
             n_pages = read_int(p.stdout)
             if n_pages == 0 or n_pages > errors.MAX_PAGES:
                 raise errors.MaxPagesException()
-            percentage_per_page = 100 / n_pages
+            step = 100 / n_pages / 2
 
-            pix_converter = PixelsToPDF()
-            pix_converter.convert_start()
+            safe_doc = fitz.Document()
 
             for page in range(1, n_pages + 1):
                 text = f"Converting page {page}/{n_pages} to pixels"
+                percentage += step
                 self.print_progress(document, False, text, percentage)
 
                 width = read_int(p.stdout)
@@ -142,19 +178,28 @@ class IsolationProvider(ABC):
                     num_pixels,
                 )
 
-                # FIXME: We need to pause the stopwatch here.
-                pix_converter.convert_next_page(
+                if ocr_lang:
+                    text = (
+                        f"Converting page {page}/{n_pages} from pixels to"
+                        " searchable PDF"
+                    )
+                else:
+                    text = f"Converting page {page}/{n_pages} from pixels to PDF"
+                percentage += step
+                self.print_progress(document, False, text, percentage)
+
+                page_pdf = self._pixels_to_pdf(
                     untrusted_pixels,
                     width,
                     height,
                     ocr_lang,
                 )
-                percentage += percentage_per_page
+                safe_doc.insert_pdf(page_pdf)
 
         # Ensure nothing else is read after all bitmaps are obtained
         p.stdout.close()
 
-        pix_converter.convert_finalize(document.output_filename)
+        safe_doc.save(document.output_filename)
 
         # TODO handle leftover code input
         text = "Converted document"

@@ -45,6 +45,22 @@ def get_resource_path(filename: str) -> str:
     return str(resource_path)
 
 
+def get_tessdata_dir() -> str:
+    if (
+            getattr(sys, "dangerzone_dev", False)
+            or platform.system() == "Windows"
+            or platform.system() == "Darwin"
+    ):
+        # Always use the tessdata path from the Dangerzone ./share directory, for
+        # development builds, or in Windows/macOS platforms.
+        return get_resource_path("tessdata")
+    if "fedora" in platform.linux_distribution()[0].lower():
+        # Fedora stores the tessdata dir in a different place than Ubuntu/Debian.
+        return "/usr/share/tesseract/tessdata/"
+    else:
+        return "/usr/share/tessdata/"
+
+
 def get_version() -> str:
     try:
         with open(get_resource_path("version.txt")) as f:

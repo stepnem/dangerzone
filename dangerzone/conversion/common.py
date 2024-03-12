@@ -4,6 +4,7 @@ import asyncio
 import glob
 import json
 import os
+import platform
 import re
 import shutil
 import subprocess
@@ -19,13 +20,6 @@ INT_BYTES = 2
 def running_on_qubes() -> bool:
     # https://www.qubes-os.org/faq/#what-is-the-canonical-way-to-detect-qubes-vm
     return os.path.exists("/usr/share/qubes/marker-vm")
-
-
-def get_tessdata_dir() -> str:
-    if running_on_qubes():
-        return "/usr/share/tesseract/tessdata/"
-    else:
-        return "/usr/share/tessdata/"
 
 
 class DangerzoneConverter:
