@@ -161,6 +161,9 @@ jobs:
       - restore_cache: *restore-cache
       - run: *copy-image
       - run:
+          name: Download tessdata
+          command: python3 ./install/common/download-tessdata.py
+      - run:
           name: run automated tests
           command: |
             poetry run make test
@@ -180,6 +183,9 @@ jobs:
       - run: *calculate-cache-key
       - restore_cache: *restore-cache
       - run: *copy-image
+      - run:
+          name: Download tessdata
+          command: python3 ./install/common/download-tessdata.py
 
       - run:
           name: Prepare Dangerzone environment
@@ -207,6 +213,9 @@ jobs:
       - run: *calculate-cache-key
       - restore_cache: *restore-cache
       - run: *copy-image
+      - run:
+          name: Download tessdata
+          command: python3 ./install/common/download-tessdata.py
 
       - run:
           name: Prepare Dangerzone environment
@@ -234,6 +243,9 @@ jobs:
       - run: *calculate-cache-key
       - restore_cache: *restore-cache
       - run: *copy-image
+      - run:
+          name: Download tessdata
+          command: python3 ./install/common/download-tessdata.py
 
       - run:
           name: Prepare Dangerzone environment
@@ -261,6 +273,9 @@ jobs:
       - run: *calculate-cache-key
       - restore_cache: *restore-cache
       - run: *copy-image
+      - run:
+          name: Download tessdata
+          command: python3 ./install/common/download-tessdata.py
 
       - run:
           name: Prepare Dangerzone environment
@@ -288,6 +303,9 @@ jobs:
       - run: *calculate-cache-key
       - restore_cache: *restore-cache
       - run: *copy-image
+      - run:
+          name: Download tessdata
+          command: python3 ./install/common/download-tessdata.py
 
       - run:
           name: Prepare Dangerzone environment
@@ -315,6 +333,9 @@ jobs:
       - run: *calculate-cache-key
       - restore_cache: *restore-cache
       - run: *copy-image
+      - run:
+          name: Download tessdata
+          command: python3 ./install/common/download-tessdata.py
 
       - run:
           name: Prepare Dangerzone environment
@@ -342,6 +363,9 @@ jobs:
       - run: *calculate-cache-key
       - restore_cache: *restore-cache
       - run: *copy-image
+      - run:
+          name: Download tessdata
+          command: python3 ./install/common/download-tessdata.py
 
       - run:
           name: Prepare Dangerzone environment
@@ -386,6 +410,9 @@ jobs:
       - run: *calculate-cache-key
       - restore_cache: *restore-cache
       - run: *copy-image
+      - run:
+          name: Download tessdata
+          command: python3 ./install/common/download-tessdata.py
 
       - run:
           name: Prepare Dangerzone environment
