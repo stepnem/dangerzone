@@ -73,7 +73,19 @@ class IsolationProvider(ABC):
             conversion_proc = self.start_doc_to_pixels_proc()
             with tempfile.TemporaryDirectory() as t:
                 Path(f"{t}/pixels").mkdir()
-                self._convert(document, t, ocr_lang, conversion_proc)
+                try:
+                    self._convert(document, t, ocr_lang, conversion_proc)
+                finally:
+                    if getattr(sys, "dangerzone_dev", False):
+                        assert conversion_proc.stderr
+                        conversion_proc.wait(3)
+                        untrusted_log = read_debug_text(
+                            conversion_proc.stderr, MAX_CONVERSION_LOG_CHARS
+                        )
+                        conversion_proc.stderr.close()
+                        log.info(
+                            f"Conversion output (doc to pixels)\n{self.sanitize_conversion_str(untrusted_log)}"
+                        )
             document.mark_as_safe()
             if document.archive_after_conversion:
                 document.archive()
@@ -189,14 +201,6 @@ class IsolationProvider(ABC):
         # TODO handle leftover code input
         text = "Converted document"
         self.print_progress(document, False, text, percentage)
-
-        if getattr(sys, "dangerzone_dev", False):
-            assert p.stderr
-            untrusted_log = read_debug_text(p.stderr, MAX_CONVERSION_LOG_CHARS)
-            p.stderr.close()
-            log.info(
-                f"Conversion output (doc to pixels)\n{self.sanitize_conversion_str(untrusted_log)}"
-            )
 
     @abstractmethod
     def pixels_to_pdf(
