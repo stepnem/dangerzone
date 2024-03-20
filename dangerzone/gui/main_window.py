@@ -456,6 +456,7 @@ class ContentWidget(QtWidgets.QWidget):
         # Doc selection widget
         self.doc_selection_widget = DocSelectionWidget(self.dangerzone)
         self.doc_selection_widget.documents_selected.connect(self.documents_selected)
+        self.doc_selection_wrapper = DocSelectionDropFrame(self.doc_selection_widget)
 
         # Settings
         self.settings_widget = SettingsWidget(self.dangerzone)
@@ -476,7 +477,7 @@ class ContentWidget(QtWidgets.QWidget):
         layout = QtWidgets.QVBoxLayout()
         layout.addWidget(self.settings_widget, stretch=1)
         layout.addWidget(self.documents_list, stretch=1)
-        layout.addWidget(self.doc_selection_widget, stretch=1)
+        layout.addWidget(self.doc_selection_wrapper, stretch=1)
         self.setLayout(layout)
 
     def documents_selected(self, docs: List[Document]) -> None:
@@ -506,7 +507,7 @@ class ContentWidget(QtWidgets.QWidget):
         for doc in docs:
             self.dangerzone.add_document(doc)
 
-        self.doc_selection_widget.hide()
+        self.doc_selection_wrapper.hide()
         self.settings_widget.show()
 
         if len(docs) > 0:
@@ -583,6 +584,23 @@ class DocSelectionWidget(QtWidgets.QWidget):
         else:
             # No files selected
             pass
+
+
+class DocSelectionDropFrame(QtWidgets.QFrame):
+    """
+    HACK Docs selecting widget "drag-n-drop" border widget
+    The border frame doesn't show around the whole widget
+    unless there is another widget wrapping it
+    """
+
+    def __init__(self, docs_selection_widget: DocSelectionWidget) -> None:
+        super().__init__()
+        self.setProperty("style", "drag_and_drop_enabled")
+        drop_layout = QtWidgets.QVBoxLayout()
+        drop_layout.addStretch()
+        drop_layout.addWidget(docs_selection_widget, stretch=1)
+        drop_layout.addStretch()
+        self.setLayout(drop_layout)
 
 
 class SettingsWidget(QtWidgets.QWidget):
