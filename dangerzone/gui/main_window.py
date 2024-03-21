@@ -651,7 +651,9 @@ class DocSelectionDropFrame(QtWidgets.QFrame):
         # Drag and drop functionality
         self.setAcceptDrops(True)
 
-        self.document_image_text = QtWidgets.QLabel("Drag and drop\n documents here")
+        self.document_image_text = QtWidgets.QLabel(
+            "Drag and drop\n documents here\n\n or"
+        )
         self.document_image_text.setAlignment(QtCore.Qt.AlignCenter)
         self.document_image = QtWidgets.QLabel()
         self.document_image.setAlignment(QtCore.Qt.AlignCenter)
@@ -660,9 +662,9 @@ class DocSelectionDropFrame(QtWidgets.QFrame):
         )
 
         self.center_layout = QtWidgets.QVBoxLayout()
-        self.center_layout.addWidget(self.docs_selection_widget)
         self.center_layout.addWidget(self.document_image)
         self.center_layout.addWidget(self.document_image_text)
+        self.center_layout.addWidget(self.docs_selection_widget)
 
         self.drop_layout = QtWidgets.QVBoxLayout()
         self.drop_layout.addStretch()
@@ -671,36 +673,10 @@ class DocSelectionDropFrame(QtWidgets.QFrame):
 
         self.setLayout(self.drop_layout)
 
-        self.show_docs_selection_widget()
-
-    def show_drag_and_drop(self) -> None:
-        # HACK hardcoded stylesheet instead of in css because dynamic updating
-        # of styles via setProperty("style") didn't seem to work.
-        self.setStyleSheet(
-            """
-        DocSelectionDropFrame{
-            border: 2px dashed rgb(193, 193, 193);
-            border-radius: 5px;
-            margin: 5px;
-        }
-        """
-        )
-        self.document_image.show()
-        self.document_image_text.show()
-        self.docs_selection_widget.hide()
-
-    def show_docs_selection_widget(self) -> None:
-        self.setStyleSheet("")  # Disable border
-        self.document_image.hide()
-        self.document_image_text.hide()
-        self.docs_selection_widget.show()
-
     def dragEnterEvent(self, ev: QtGui.QDragEnterEvent) -> None:
-        self.show_drag_and_drop()
         ev.accept()
 
     def dragLeaveEvent(self, ev: QtGui.QDragLeaveEvent) -> None:
-        self.show_docs_selection_widget()
         ev.accept()
 
     def dropEvent(self, ev: QtGui.QDropEvent) -> None:
@@ -712,19 +688,16 @@ class DocSelectionDropFrame(QtWidgets.QFrame):
             if doc_ext in get_supported_extensions():
                 documents += [Document(doc_path)]
 
-        try:
-            # Ignore when all docs are unsupported
-            num_unsupported_docs = len(ev.mimeData().urls()) - len(documents)
-            if len(documents) == 0 or num_unsupported_docs == len(ev.mimeData().urls()):
-                return
+        # Ignore when all docs are unsupported
+        num_unsupported_docs = len(ev.mimeData().urls()) - len(documents)
+        if len(documents) == 0 or num_unsupported_docs == len(ev.mimeData().urls()):
+            return
 
-            # Confirm with user when some docs were ignored
-            if num_unsupported_docs > 0:
-                if not self.prompt_continue_without(num_unsupported_docs):
-                    return
-            self.documents_selected.emit(documents)
-        finally:  # Always reset view
-            self.show_docs_selection_widget()
+        # Confirm with user when some docs were ignored
+        if num_unsupported_docs > 0:
+            if not self.prompt_continue_without(num_unsupported_docs):
+                return
+        self.documents_selected.emit(documents)
 
     def prompt_continue_without(self, num_unsupported_docs: int) -> int:
         """
