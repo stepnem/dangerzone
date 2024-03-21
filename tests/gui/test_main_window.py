@@ -4,11 +4,12 @@ import shutil
 import time
 import typing
 
-from PySide6 import QtCore, QtWidgets
+from PySide6 import QtCore, QtGui, QtWidgets
 from pytest import MonkeyPatch, fixture
 from pytest_mock import MockerFixture
 from pytestqt.qtbot import QtBot
 
+from dangerzone.document import Document
 from dangerzone.gui import MainWindow
 from dangerzone.gui import main_window as main_window_module
 from dangerzone.gui import updater as updater_module
@@ -35,6 +36,24 @@ def content_widget(qtbot: QtBot, mocker: MockerFixture) -> ContentWidget:
     w = ContentWidget(dz)
     qtbot.addWidget(w)
     return w
+
+
+@fixture
+def drag_valid_files_event(mocker, sample_doc, sample_pdf) -> QtGui.QDropEvent:
+    ev = mocker.MagicMock()
+    ev.accept.return_value = True
+    urls = [QtCore.QUrl.fromLocalFile(x) for x in [sample_doc, sample_pdf]]
+    ev.mimeData.return_value.has_urls.return_value = True
+    ev.mimeData.return_value.urls.return_value = urls
+    return ev
+
+
+@fixture
+def drag_text_event(mocker) -> QtGui.QDropEvent:
+    ev = mocker.MagicMock()
+    ev.accept.return_value = True
+    ev.mimeData.return_value.has_urls.return_value = False
+    return ev
 
 
 def test_default_menu(
@@ -377,3 +396,28 @@ def test_change_document_button(
     ]
     assert len(docs) is 1
     assert docs[0] == str(tmp_sample_doc)
+
+
+def test_drop_valid_documents(
+    content_widget: ContentWidget,
+    drag_valid_files_event: QtGui.QDropEvent,
+    qtbot: QtBot,
+) -> None:
+    with qtbot.waitSignal(
+        content_widget.doc_selection_wrapper.documents_selected,
+        check_params_cb=lambda x: len(x) == 2 and isinstance(x[0], Document),
+    ):
+        content_widget.doc_selection_wrapper.dropEvent(drag_valid_files_event)
+        assert drag_valid_files_event.acceptProposedAction.called_once()
+
+
+def test_drop_text(
+    content_widget: ContentWidget,
+    drag_text_event: QtGui.QDropEvent,
+    qtbot: QtBot,
+) -> None:
+    with qtbot.assertNotEmitted(
+        content_widget.doc_selection_wrapper.documents_selected
+    ):
+        content_widget.doc_selection_wrapper.dropEvent(drag_text_event)
+        assert drag_text_event.acceptProposedAction.called_once()
