@@ -3,6 +3,7 @@ import pathlib
 import shutil
 import time
 import typing
+from typing import List
 
 from PySide6 import QtCore, QtGui, QtWidgets
 from pytest import MonkeyPatch, fixture
@@ -38,14 +39,35 @@ def content_widget(qtbot: QtBot, mocker: MockerFixture) -> ContentWidget:
     return w
 
 
-@fixture
-def drag_valid_files_event(mocker, sample_doc, sample_pdf) -> QtGui.QDropEvent:
+def drag_files_event(mocker, files: List[str]) -> QtGui.QDropEvent:
     ev = mocker.MagicMock()
     ev.accept.return_value = True
-    urls = [QtCore.QUrl.fromLocalFile(x) for x in [sample_doc, sample_pdf]]
+
+    urls = [QtCore.QUrl.fromLocalFile(x) for x in files]
     ev.mimeData.return_value.has_urls.return_value = True
     ev.mimeData.return_value.urls.return_value = urls
     return ev
+
+
+@fixture
+def drag_valid_files_event(mocker, sample_doc, sample_pdf) -> QtGui.QDropEvent:
+    return drag_files_event(mocker, [sample_doc, sample_pdf])
+
+
+@fixture
+def drag_1_invalid_file_event(mocker, sample_doc, tmp_path) -> QtGui.QDropEvent:
+    unsupported_file_path = tmp_path / "file.unsupported"
+    shutil.copy(sample_doc, unsupported_file_path)
+    return drag_files_event(mocker, [unsupported_file_path])
+
+
+@fixture
+def drag_1_invalid_and_2_valid_files_event(
+    mocker, tmp_path, sample_doc, sample_pdf
+) -> QtGui.QDropEvent:
+    unsupported_file_path = tmp_path / "file.unsupported"
+    shutil.copy(sample_doc, unsupported_file_path)
+    return drag_files_event(mocker, [sample_doc, sample_pdf, unsupported_file_path])
 
 
 @fixture
@@ -421,3 +443,49 @@ def test_drop_text(
     ):
         content_widget.doc_selection_wrapper.dropEvent(drag_text_event)
         assert drag_text_event.acceptProposedAction.called_once()
+
+
+def test_drop_1_invalid_doc(
+    content_widget: ContentWidget,
+    drag_1_invalid_file_event: QtGui.QDropEvent,
+    qtbot: QtBot,
+) -> None:
+    with qtbot.assertNotEmitted(
+        content_widget.doc_selection_wrapper.documents_selected
+    ):
+        content_widget.doc_selection_wrapper.dropEvent(drag_1_invalid_file_event)
+        assert drag_1_invalid_file_event.acceptProposedAction.called_once()
+
+
+def test_drop_1_invalid_2_valid_documents(
+    content_widget: ContentWidget,
+    drag_1_invalid_and_2_valid_files_event: QtGui.QDropEvent,
+    qtbot: QtBot,
+    monkeypatch,
+) -> None:
+    # If we accept to continue
+    monkeypatch.setattr(
+        content_widget.doc_selection_wrapper, "prompt_continue_without", lambda x: True
+    )
+
+    # Then the 2 valid docs will be selected
+    with qtbot.waitSignal(
+        content_widget.doc_selection_wrapper.documents_selected,
+        check_params_cb=lambda x: len(x) == 2 and isinstance(x[0], Document),
+    ):
+        content_widget.doc_selection_wrapper.dropEvent(
+            drag_1_invalid_and_2_valid_files_event
+        )
+
+    # If we refuse to continue
+    monkeypatch.setattr(
+        content_widget.doc_selection_wrapper, "prompt_continue_without", lambda x: False
+    )
+
+    # Then no docs will be selected
+    with qtbot.assertNotEmitted(
+        content_widget.doc_selection_wrapper.documents_selected,
+    ):
+        content_widget.doc_selection_wrapper.dropEvent(
+            drag_1_invalid_and_2_valid_files_event
+        )
