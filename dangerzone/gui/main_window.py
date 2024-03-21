@@ -472,6 +472,7 @@ class ContentWidget(QtWidgets.QWidget):
         self.doc_selection_widget = DocSelectionWidget(self.dangerzone)
         self.doc_selection_widget.documents_selected.connect(self.documents_selected)
         self.doc_selection_wrapper = DocSelectionDropFrame(self.doc_selection_widget)
+        self.doc_selection_wrapper.documents_selected.connect(self.documents_selected)
 
         # Settings
         self.settings_widget = SettingsWidget(self.dangerzone)
@@ -608,14 +609,76 @@ class DocSelectionDropFrame(QtWidgets.QFrame):
     unless there is another widget wrapping it
     """
 
+    documents_selected = QtCore.Signal(list)
+
     def __init__(self, docs_selection_widget: DocSelectionWidget) -> None:
         super().__init__()
-        self.setProperty("style", "drag_and_drop_enabled")
-        drop_layout = QtWidgets.QVBoxLayout()
-        drop_layout.addStretch()
-        drop_layout.addWidget(docs_selection_widget, stretch=1)
-        drop_layout.addStretch()
-        self.setLayout(drop_layout)
+        self.docs_selection_widget = docs_selection_widget
+
+        # Drag and drop functionality
+        self.setAcceptDrops(True)
+
+        self.document_image_text = QtWidgets.QLabel("Drag and drop\n documents here")
+        self.document_image_text.setAlignment(QtCore.Qt.AlignCenter)
+        self.document_image = QtWidgets.QLabel()
+        self.document_image.setAlignment(QtCore.Qt.AlignCenter)
+        self.document_image.setPixmap(
+            load_svg_image("document.svg", width=20, height=24)
+        )
+
+        self.center_layout = QtWidgets.QVBoxLayout()
+        self.center_layout.addWidget(self.docs_selection_widget)
+        self.center_layout.addWidget(self.document_image)
+        self.center_layout.addWidget(self.document_image_text)
+
+        self.drop_layout = QtWidgets.QVBoxLayout()
+        self.drop_layout.addStretch()
+        self.drop_layout.addLayout(self.center_layout)
+        self.drop_layout.addStretch()
+
+        self.setLayout(self.drop_layout)
+
+        self.show_docs_selection_widget()
+
+    def show_drag_and_drop(self) -> None:
+        # HACK hardcoded stylesheet instead of in css because dynamic updating
+        # of styles via setProperty("style") didn't seem to work.
+        self.setStyleSheet(
+            """
+        DocSelectionDropFrame{
+            border: 2px dashed rgb(193, 193, 193);
+            border-radius: 5px;
+            margin: 5px;
+        }
+        """
+        )
+        self.document_image.show()
+        self.document_image_text.show()
+        self.docs_selection_widget.hide()
+
+    def show_docs_selection_widget(self) -> None:
+        self.setStyleSheet("")  # Disable border
+        self.document_image.hide()
+        self.document_image_text.hide()
+        self.docs_selection_widget.show()
+
+    def dragEnterEvent(self, ev: QtGui.QDragEnterEvent) -> None:
+        self.show_drag_and_drop()
+        ev.accept()
+
+    def dragLeaveEvent(self, ev: QtGui.QDragLeaveEvent) -> None:
+        self.show_docs_selection_widget()
+        ev.accept()
+
+    def dropEvent(self, ev: QtGui.QDropEvent) -> None:
+        ev.setDropAction(QtCore.Qt.CopyAction)
+        documents = []
+        for url_path in ev.mimeData().urls():
+            # FIXME accept conditionally based on extension
+            doc_path = url_path.toLocalFile()
+            documents += [Document(doc_path)]
+        if len(documents) > 0:  # Some drops may have been ignored
+            self.documents_selected.emit(documents)
 
 
 class SettingsWidget(QtWidgets.QWidget):
