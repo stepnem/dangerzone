@@ -69,6 +69,45 @@ def load_svg_image(filename: str, width: int, height: int) -> QtGui.QPixmap:
     return pixmap
 
 
+def get_supported_extensions() -> List[str]:
+    supported_ext = [
+        ".pdf",
+        ".docx",
+        ".doc",
+        ".docm",
+        ".xlsx",
+        ".xls",
+        ".pptx",
+        ".ppt",
+        ".odt",
+        ".odg",
+        ".odp",
+        ".ods",
+        ".epub",
+        ".jpg",
+        ".jpeg",
+        ".gif",
+        ".png",
+        " .tif",
+        ".tiff",
+        ".bmp",
+        ".pnm",
+        ".pbm",
+        ".ppm",
+        ".svg",
+    ]
+
+    # XXX: We disable loading HWP/HWPX files on Qubes, because H2ORestart does not work there.
+    # See:
+    #
+    # https://github.com/freedomofpress/dangerzone/issues/494
+    hwp_filters = [".hwp", ".hwpx"]
+    if is_qubes_native_conversion():
+        supported_ext += hwp_filters
+
+    return supported_ext
+
+
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self, dangerzone: DangerzoneGui) -> None:
         super(MainWindow, self).__init__()
@@ -569,20 +608,8 @@ class DocSelectionWidget(QtWidgets.QWidget):
         self.file_dialog = QtWidgets.QFileDialog()
         self.file_dialog.setWindowTitle("Open Documents")
         self.file_dialog.setFileMode(QtWidgets.QFileDialog.ExistingFiles)
-
-        # XXX: We disable loading HWP/HWPX files on Qubes, because H2ORestart does not work there.
-        # See:
-        #
-        # https://github.com/freedomofpress/dangerzone/issues/494
-        hwp_filters = "*.hwp *.hwpx"
-        if is_qubes_native_conversion():
-            hwp_filters = ""
         self.file_dialog.setNameFilters(
-            [
-                "Documents (*.pdf *.docx *.doc *.docm *.xlsx *.xls *.pptx *.ppt *.odt"
-                f" *.odg *.odp *.ods {hwp_filters} *.epub *.jpg *.jpeg *.gif *.png"
-                " *.tif *.tiff *.bmp *.pnm *.pbm *.ppm *.svg)"
-            ]
+            [f"Documents (*" + " *".join(get_supported_extensions()) + ")"]
         )
 
     def dangerous_doc_button_clicked(self) -> None:
@@ -674,9 +701,10 @@ class DocSelectionDropFrame(QtWidgets.QFrame):
         ev.setDropAction(QtCore.Qt.CopyAction)
         documents = []
         for url_path in ev.mimeData().urls():
-            # FIXME accept conditionally based on extension
             doc_path = url_path.toLocalFile()
-            documents += [Document(doc_path)]
+            doc_ext = os.path.splitext(doc_path)[1]
+            if doc_ext in get_supported_extensions():
+                documents += [Document(doc_path)]
         if len(documents) > 0:  # Some drops may have been ignored
             self.documents_selected.emit(documents)
 
