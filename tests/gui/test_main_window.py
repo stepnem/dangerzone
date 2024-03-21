@@ -124,7 +124,7 @@ def test_update_detected(
     window = MainWindow(updater.dangerzone)
     window.register_update_handler(updater.finished)
     handle_updates_spy = mocker.spy(window, "handle_updates")
-    load_svg_spy = mocker.spy(window, "load_svg_image")
+    load_svg_spy = mocker.spy(main_window_module, "load_svg_image")
 
     menu_actions_before = window.hamburger_button.menu().actions()
 
@@ -234,7 +234,7 @@ def test_update_error(
     window = MainWindow(updater.dangerzone)
     window.register_update_handler(updater.finished)
     handle_updates_spy = mocker.spy(window, "handle_updates")
-    load_svg_spy = mocker.spy(window, "load_svg_image")
+    load_svg_spy = mocker.spy(main_window_module, "load_svg_image")
 
     menu_actions_before = window.hamburger_button.menu().actions()
 

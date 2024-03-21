@@ -54,6 +54,21 @@ about updates.</p>
 HAMBURGER_MENU_SIZE = 30
 
 
+def load_svg_image(filename: str, width: int, height: int) -> QtGui.QPixmap:
+    """Load an SVG image from a filename.
+
+    This answer is basically taken from: https://stackoverflow.com/a/25689790
+    """
+    path = get_resource_path(filename)
+    svg_renderer = QtSvg.QSvgRenderer(path)
+    image = QtGui.QImage(width, height, QtGui.QImage.Format_ARGB32)
+    # Set the ARGB to 0 to prevent rendering artifacts
+    image.fill(0x00000000)
+    svg_renderer.render(QtGui.QPainter(image))
+    pixmap = QtGui.QPixmap.fromImage(image)
+    return pixmap
+
+
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self, dangerzone: DangerzoneGui) -> None:
         super(MainWindow, self).__init__()
@@ -88,7 +103,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.hamburger_button = QtWidgets.QToolButton()
         self.hamburger_button.setPopupMode(QtWidgets.QToolButton.InstantPopup)
         self.hamburger_button.setIcon(
-            QtGui.QIcon(self.load_svg_image("hamburger_menu.svg"))
+            QtGui.QIcon(load_svg_image("hamburger_menu.svg", width=64, height=64))
         )
         self.hamburger_button.setFixedSize(HAMBURGER_MENU_SIZE, HAMBURGER_MENU_SIZE)
         self.hamburger_button.setIconSize(
@@ -168,20 +183,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.setProperty("OSColorMode", self.dangerzone.app.os_color_mode.value)
 
         self.show()
-
-    def load_svg_image(self, filename: str) -> QtGui.QPixmap:
-        """Load an SVG image from a filename.
-
-        This answer is basically taken from: https://stackoverflow.com/a/25689790
-        """
-        path = get_resource_path(filename)
-        svg_renderer = QtSvg.QSvgRenderer(path)
-        image = QtGui.QImage(64, 64, QtGui.QImage.Format_ARGB32)
-        # Set the ARGB to 0 to prevent rendering artifacts
-        image.fill(0x00000000)
-        svg_renderer.render(QtGui.QPainter(image))
-        pixmap = QtGui.QPixmap.fromImage(image)
-        return pixmap
 
     def show_update_success(self) -> None:
         """Inform the user about a new Dangerzone release."""
@@ -263,13 +264,21 @@ class MainWindow(QtWidgets.QMainWindow):
                 return
 
             self.hamburger_button.setIcon(
-                QtGui.QIcon(self.load_svg_image("hamburger_menu_update_error.svg"))
+                QtGui.QIcon(
+                    load_svg_image(
+                        "hamburger_menu_update_error.svg", width=64, height=64
+                    )
+                )
             )
             sep = hamburger_menu.insertSeparator(hamburger_menu.actions()[0])
             # FIXME: Add red bubble next to the text.
             error_action = QtGui.QAction("Update error", hamburger_menu)  # type: ignore [attr-defined]
             error_action.setIcon(
-                QtGui.QIcon(self.load_svg_image("hamburger_menu_update_dot_error.svg"))
+                QtGui.QIcon(
+                    load_svg_image(
+                        "hamburger_menu_update_dot_error.svg", width=64, height=64
+                    )
+                )
             )
             error_action.triggered.connect(self.show_update_error)
             hamburger_menu.insertAction(sep, error_action)
@@ -284,14 +293,20 @@ class MainWindow(QtWidgets.QMainWindow):
             self.dangerzone.settings.save()
 
             self.hamburger_button.setIcon(
-                QtGui.QIcon(self.load_svg_image("hamburger_menu_update_success.svg"))
+                QtGui.QIcon(
+                    load_svg_image(
+                        "hamburger_menu_update_success.svg", width=64, height=64
+                    )
+                )
             )
 
             sep = hamburger_menu.insertSeparator(hamburger_menu.actions()[0])
             success_action = QtGui.QAction("New version available", hamburger_menu)  # type: ignore [attr-defined]
             success_action.setIcon(
                 QtGui.QIcon(
-                    self.load_svg_image("hamburger_menu_update_dot_available.svg")
+                    load_svg_image(
+                        "hamburger_menu_update_dot_available.svg", width=64, height=64
+                    )
                 )
             )
             success_action.triggered.connect(self.show_update_success)
