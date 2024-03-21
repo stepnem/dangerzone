@@ -510,7 +510,9 @@ class ContentWidget(QtWidgets.QWidget):
         # Doc selection widget
         self.doc_selection_widget = DocSelectionWidget(self.dangerzone)
         self.doc_selection_widget.documents_selected.connect(self.documents_selected)
-        self.doc_selection_wrapper = DocSelectionDropFrame(self.doc_selection_widget)
+        self.doc_selection_wrapper = DocSelectionDropFrame(
+            self.dangerzone, self.doc_selection_widget
+        )
         self.doc_selection_wrapper.documents_selected.connect(self.documents_selected)
 
         # Settings
@@ -638,8 +640,12 @@ class DocSelectionDropFrame(QtWidgets.QFrame):
 
     documents_selected = QtCore.Signal(list)
 
-    def __init__(self, docs_selection_widget: DocSelectionWidget) -> None:
+    def __init__(
+        self, dangerzone: DangerzoneGui, docs_selection_widget: DocSelectionWidget
+    ) -> None:
         super().__init__()
+
+        self.dangerzone = dangerzone
         self.docs_selection_widget = docs_selection_widget
 
         # Drag and drop functionality
@@ -705,8 +711,41 @@ class DocSelectionDropFrame(QtWidgets.QFrame):
             doc_ext = os.path.splitext(doc_path)[1]
             if doc_ext in get_supported_extensions():
                 documents += [Document(doc_path)]
-        if len(documents) > 0:  # Some drops may have been ignored
+
+        try:
+            # Ignore when all docs are unsupported
+            num_unsupported_docs = len(ev.mimeData().urls()) - len(documents)
+            if len(documents) == 0 or num_unsupported_docs == len(ev.mimeData().urls()):
+                return
+
+            # Confirm with user when some docs were ignored
+            if num_unsupported_docs > 0:
+                if not self.prompt_continue_without(num_unsupported_docs):
+                    return
             self.documents_selected.emit(documents)
+        finally:  # Always reset view
+            self.show_docs_selection_widget()
+
+    def prompt_continue_without(self, num_unsupported_docs: int) -> int:
+        """
+        Prompt the use if they want to convert even though some files are not
+        supported.
+        """
+        if num_unsupported_docs == 1:
+            text = f"{num_unsupported_docs} file is not supported."
+            ok_text = "Continue without this file"
+        else:  # plural
+            text = f"{num_unsupported_docs} files are not supported."
+            ok_text = "Continue without these file"
+
+        alert_widget = Alert(
+            self.dangerzone,
+            message=f"{text}\n The supported extensions are: "
+            + ", ".join(get_supported_extensions()),
+            ok_text=ok_text,
+        )
+
+        return alert_widget.exec_()
 
 
 class SettingsWidget(QtWidgets.QWidget):
